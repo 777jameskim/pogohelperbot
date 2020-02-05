@@ -1,0 +1,231 @@
+function validteam(text){
+  if(find(text,Instinct)!=-1){return "Instinct";}
+  if(find(text,Mystic)!=-1){return "Mystic";}
+  if(find(text,Valor)!=-1){return "Valor";}
+  return -1;
+}
+
+function bossformat(array,language){
+  var moninfo=null;
+  var formindex=null;
+  var stars=null;
+  var shinypossible=null;
+  for(var i=0;i<array.length;i++){
+    if(moninfo==null&&!isNaN(array[i])){moninfo=findmon(array[i],language);array.splice(i,1);i--;}
+    else if(stars==null&&array[i].indexOf('*')!=-1){
+      if(array[i][1]=='*'){if(!isNaN(array[i][0])){stars=array[i][0];array.splice(i,1);i--;}}
+      else if(array[i][0]=='*'){if(!isNaN(array[i][1])){stars=array[i][1];array.splice(i,1);i--;}}
+    }
+    else if(stars==null&&array[i].toLowerCase()=="ex"){stars="EX";array.splice(i,1);i--;}
+    else if(shiny.indexOf(array[i])!=-1){shinypossible=true;array.splice(i,1);i--;}
+    else if(moninfo==null){
+      moninfo=findmon(array[i],language);
+      if(moninfo!=null){array.splice(i,1);i--};
+    }
+  }
+  if(moninfo!=null){
+    if(moninfo[4]!=""){
+      if(moninfo[4]=="Alolan"){for(var i=0;i<array.length;i++){for(var j=0;j<Alolan.length&&formindex==null;j++){if(array[i].toLowerCase().indexOf(Alolan[j].toLowerCase())!=-1){formindex="RV";array.splice(i,1);i--;}}}}
+      else if(moninfo[4]=="Galarian"){for(var i=0;i<array.length;i++){for(var j=0;j<Galarian.length&&formindex==null;j++){if(array[i].toLowerCase().indexOf(Galarian[j].toLowerCase())!=-1){formindex="RV";array.splice(i,1);i--;}}}}
+    }
+    if(moninfo[3]!=""&&formindex!="RV"){
+      for(var i=0;i<array.length;i++){
+        if(findfi(moninfo[0],array[i],language)!=-1){formindex=findfi(moninfo[0],array[i],language)}
+      }
+    }
+  }
+  return [moninfo,formindex,stars,shinypossible]
+}
+
+function checkboss(newboss){
+  var [moninfo,formindex,stars,shiny]=newboss;
+  var checklist=0;
+  //checklist%1: needs shiny
+  if(shiny==null){checklist=checklist+1}
+  //checklist%2: needs stars
+  if(stars==null){checklist=checklist+2;}
+  else if(isNaN(stars)&&stars!="EX"){checklist=checklist+2}
+  else{if(stars<1||stars>5||stars%1!=0){if(stars!="EX"){checklist=checklist+2}}}
+  //checklist%4: needs form
+  if(formindex==null&&moninfo[4]!=""){checklist=checklist+4;}
+  else if((formindex==null||formindex=="X")&&moninfo[3]!=""){checklist=checklist+4;}
+  var knownbosses=raidlist.getRange("A2:B").getValues();
+  //checklist%8: this form is taken (if other forms exist)
+  //checklist%16: (all forms of) this pokémon are taken
+  if((moninfo[3]!=""||moninfo[4]!="")){
+    var forms=hasform(moninfo[0]);
+    var rv=hasrv(moninfo[0]);
+    var formcount=0;
+    for(var i=0;i<knownbosses.length&&moninfo[0]==knownbosses[i][0];i++){
+      formcount++;
+      if(formindex==knownbosses[i][1]){checklist=checklist+8;}
+      if(formindex=="X"&&knownbosses[i][1]==""){checklist=checklist+8;}
+    }
+    if(moninfo[4]==""){if(formcount>=forms.length){checklist=checklist+16;}}
+    else if(moninfo[3]==""){if(formcount>=2){checklist=checklist+16;}}
+    else{if(formcount>=forms.length+1){checklist=checklist+16;}}
+  }
+  else{
+    for(var i=0;i<knownbosses.length;i++){if(moninfo[0]==knownbosses[i][0]){checklist=checklist+16}}
+  }
+  return checklist;
+}
+
+function writeboss(moninfo,formindex,stars,shiny){
+  if(formindex=="RV"){
+    var rv=hasrv(moninfo[0]);
+    var bossrow=[moninfo[0],"RV",rv[3]+" "+moninfo[5],rv[1],rv[2],stars,shiny];
+    bossrow=bossrow.concat(moninfo.slice(5));
+    raidlist.appendRow(bossrow);
+  }
+  else if(moninfo[3]!=""){
+    var forms=hasform(moninfo[0]);
+    if(formindex==forms.length){
+      raidlist.sort(1);
+      var knownbosses=raidlist.getRange("A2:A").getValues();
+      var firstindex=sortedfirst(moninfo[0],knownbosses);
+      if(firstindex!=-1){
+        var count=0;
+        for(var i=firstindex;i<knownbosses.length&&moninfo[0]==knownbosses[i];i++){count++;}
+        if(knownbosses.length==count){raidlist.insertRowAfter(raidlist.getLastRow());}
+        raidlist.deleteRows(firstindex+2,count);
+      }
+      for(var i=0;i<forms.length;i++){
+        var bossrow=[moninfo[0],i,forms[i][3]+" "+moninfo[5],forms[i][1],forms[i][2],stars,shiny];
+        bossrow=bossrow.concat(moninfo.slice(5));
+        raidlist.appendRow(bossrow);
+      }
+    }
+    else{
+      var prefix=forms[formindex][3];
+      if(prefix!=""){prefix=prefix+" ";}
+      bossrow=[moninfo[0],formindex,prefix+moninfo[5],forms[formindex][1],forms[formindex][2],stars,shiny];
+      bossrow=bossrow.concat(moninfo.slice(5));
+      raidlist.appendRow(bossrow);
+    }
+  }
+  else{
+    bossrow=[moninfo[0],null,moninfo[5],moninfo[1],moninfo[2],stars,shiny];
+    bossrow=bossrow.concat(moninfo.slice(5));
+    raidlist.appendRow(bossrow);
+  }
+  raidlist.sort(2);
+  raidlist.sort(1);
+  raidlist.sort(6,false);
+}
+
+function reportformat(date,timezone,array,language){
+  var now=new Date(date*1000);
+  var raidstart=null;
+  var bossinfo=null;
+  for(var i=0;i<array.length;i++){
+    if(raidstart==null&&array[i].indexOf(':')!=-1){//find time
+      if(array[i].length==2){
+        var time=new Date(now-(settings.getRange("B3").getValue()-array[i][1])*60*1000);
+        time=Utilities.formatDate(new Date(time),timezone,"HH:mm");
+      }
+      else if(array[i].length==3){
+        if(array[i].indexOf(':')==0){
+          var time=new Date(now-(settings.getRange("B3").getValue()-(array[i][1]+array[i][2]))*60*1000);
+          time=Utilities.formatDate(new Date(time),timezone,"HH:mm");
+        }
+        else if(array[i].indexOf(':')==1){var time="0"+array[i][0]+":0"+array[i][2];}
+        else{var time=array[i]+"00";}
+      }
+      else if(array[i].length==4){var time="0"+array[i];}
+      else if(array[i].length==5){var time=array[i];}
+      if(now>raidtime(date,timezone,"12:00")){if(time[0]+time[1]<10){time=Number(time[0]+time[1])+12+":"+time[3]+time[4]};}
+      if(0<=time[0]+time[1]&&time[0]+time[1]<24&&0<=time[3]+time[4]&&time[3]+time[4]<60){raidstart=raidtime(date,timezone,time);array.splice(i,1);i--;}
+    }
+    else if(bossinfo==null&&(array[i].indexOf('*')!=-1||array[i].toLowerCase()=="ex")){//find stars
+      if(array[i][1]=='*'){if(0<array[i][0]&&array[i][0]<6){bossinfo=array[i][0];array.splice(i,1);i--;}}//check stars
+      else if(array[i][0]=='*'){if(0<array[i][1]&&array[i][1]<6){bossinfo=array[i][1];array.splice(i,1);i--;}}
+      else if(array[i].toLowerCase()=="ex"){bossinfo="EX";array.splice(i,1);i--;}
+    }
+  }
+  if(raidstart!=null){//time given
+    if(raidstart<now){//egg hasn't hatched
+      if(bossinfo!=null){//stars found
+        var knownbosses=getstarbosses(bossinfo);
+        if(knownbosses.length==1){//only one boss
+          var langi=languageindex(language)+11;
+          bossinfo=knownbosses[0];
+          var exit=array.length;
+          for(var j=0;j<array.length&&array.length==exit;j++){if(array[j].toLowerCase()==bossinfo[langi].toLowerCase()){array.splice(j,1);if(j<i){i--;}}}
+          if(bossinfo[1]=="RV"){
+            if(langi==11||(12<langi&&langi<17)){var keyword="alola";}
+            else if(langi==12){var keyword="アローラ";}
+            else if(langi==17){var keyword="알로라";}
+            else if(langi==18){var keyword="阿羅拉";}
+            var exit=array.length;
+            for(var j=0;j<array.length&&array.length==exit;j++){if(array[j].toLowerCase().indexOf(keyword)!=-1){array.splice(j,1);if(j<i){i--;}}}
+          }
+          else if(bossinfo[1]!=""){
+            var form=hasform(bossinfo[0],bossinfo[1])[langi-8];
+            var exit=array.length;
+            for(var j=0;j<array.length&&array.length==exit;j++){if(array[j].toLowerCase()==form){array.splice(j,1);if(j<i){i--;}}}
+          }
+        }
+      }
+    }
+    else{//egg has hatched
+      var bossinfo=[];
+      for(var i=0;i<array.length;i++){
+        if(bossinfo.length==0){//find mon
+          bossinfo=findboss(array[i],language);
+          if(bossinfo.length==1){
+            array.splice(i,1);i--;
+            var keyword="";
+            if(language=="en"||language=="fr"||language=="de"||language=="it"||language=="es"){keyword="alola";}
+            else if(language=="ja"){keyword="アローラ";}
+            else if(language=="ko"){keyword="알로라";}
+            else if(language=="zh"){keyword="阿羅拉";}
+            if(bossinfo.length==1){
+              bossinfo=bossinfo[0];
+              stars=bossinfo[5];
+              if(bossinfo[1]=="RV"){for(var j=0;j<array.length;j++){if(array[j].toLowerCase().indexOf(keyword.toLowerCase())!=-1){array.splice(j,1);if(j<i){i--;}}}}
+            }
+          }
+          else{//sameboss
+          }
+        }
+      }
+    }
+  }
+  return [raidstart,arraystring(array),bossinfo];
+}
+
+function checkreport(date,timezone,newraid){
+  var now=new Date(date*1000);
+  var raidstart=newraid[0];
+  var gym=newraid[1];
+  var stars=newraid[2];
+  var bossinfo=newraid[3];
+  var checklist=0;
+  //checklist%1: no mon/form (if past egg open)
+  if(raidstart!=null&&now>raidstart){if(bossinfo.length==0||isArray(bossinfo[0])){checklist=checklist+1;}}
+  //checklist%2: no stars
+  if(stars==null){
+    if(bossinfo.length==0){checklist=checklist+2;}
+    else if(bossinfo.length!=1){
+      var samestars=true;
+      for(var i=1;i<bossinfo.length;i++){if(bossinfo[i][5]!=bossinfo[0][5]){samestars=false;}}
+      if(!samestars){checklist=checklist+2;}
+    }
+    //checklist%4: invalid time
+    if(raidstart!=null){if(now>endtime(raidstart)||now<eggtime(raidstart)){checklist=checklist+4;}}
+    else{checklist=checklist+4;}
+  }
+  else{
+    if(raidstart!=null){
+      if(now>endtime(raidstart,stars)){checklist=checklist+4}
+      else if(stars!="EX"&&now<eggtime(raidstart,stars)){checklist=checklist+4;}
+    }
+    else{checklist=checklist+4;}
+  }
+  return checklist;
+}
+
+function makeraidlist(gid){
+  
+}
