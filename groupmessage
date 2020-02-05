@@ -1,0 +1,63 @@
+function groupmessage(data,gid) {
+  var mid=data.message.message_id;
+  var date=data.message.date;
+  var gssurl=DriveApp.getFilesByName(gid).next().getUrl();
+  var ginfo=SpreadsheetApp.openByUrl(gssurl).getSheets()[0];
+  var guserlist=SpreadsheetApp.openByUrl(gssurl).getSheets()[1];
+  if(data.message.text!=null||data.message.new_chat_members!=null){
+    var id=data.message.from.id;
+    //user needs setup
+    if(getuserrange(id)==null){
+      var language=ginfo.getRange("B2").getValue();
+      if(language=="en"){sendMessage(gid,"You need to register as a user before sending a command!\n"
+                                     +"Please start a private chat with me to get started!",mid);}
+      else if(language=="ko"){sendMessage(gid,"명령어를 사용하기 위해선 우선 유저등록을 먼저 해야합니다!\n"
+                                     +"저랑 개인톡을 열어서 설정을 시작해주세요!",mid);}
+      return;
+    }
+    var userinfo=getuserrange(id).getValues()[0];
+    var language=userinfo[3];
+    //user setup unfinished
+    if(userinfo[6]==""){
+      if(userinfo[3]=="en"){sendMessage(gid,"You need to finish your registration before sending a command!",mid);}
+      else if(userinfo[3]=="ko"){sendMessage(gid,"명령어를 사용하기 위해선 우선 유저등록을 끝까지 마쳐야합니다!",mid);}
+      return;
+    }
+    //not in guserlist (possible if bot was added after these users)
+    if(find(id,guserlist.getRange("B2:B").getValues())==-1){
+      guserlist.appendRow([false,userinfo[0],userinfo[1],userinfo[2],userinfo[3],userinfo[4],userinfo[5]]);
+      guserlist.sort(2);
+      getuserrange(id).getCell(1,9).setValue(gid);
+    }
+    if(language=="en"){engroupmessage(data,gid);}
+    else if(language=="ko"){kogroupmessage(data,gid);}
+  }
+  //user has left the chatroom
+  else if(data.message.left_chat_member!=null){
+    var leftmember=data.message.left_chat_member;
+    if(!leftmember.is_bot){
+      var knownid=userlist.getRange("A2:A").getValues();
+      var rownum=sortedfind(leftmember.id,knownid)+2;
+      if(knownid.length==1){userlist.insertRowAfter(userlist.getLastRow())}
+      userlist.deleteRow(rownum);
+    }
+    else if(leftmember.id==botid){
+      var knowngid=grouplist.getRange("A2:A").getValues();
+      var rownum=sortedfind(gid,knowngid)+2;
+      if(rownum!=1){
+        if(knowngid.length==1){grouplist.insertRowAfter(grouplist.getLastRow())}
+        grouplist.deleteRow(rownum);
+      }
+      DriveApp.getFilesByName(gid).next().setName(gid+" : discontinued "+Utilities.formatDate(new Date(date*1000),"Asia/Seoul","yyyy/MM/dd HH:mm:ss 'GMT'Z"));
+    }
+  }
+  //group -> supergroup
+  else if(data.message.migrate_to_chat_id!=null){
+    var newgid=data.message.migrate_to_chat_id;
+    DriveApp.getFilesByName(gid).next().setName(newgid);
+    var knowngid=grouplist.getRange("A2:A");
+    var rownum=sortedfind(gid,knowngid.getValues())+1;
+    knowngid.getCell(rownum,1).setValue(newgid);
+    grouplist.sort(1);
+  }
+}
