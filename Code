@@ -1,0 +1,231 @@
+var token = "xxx";
+var telegram = "https://api.telegram.org/bot"+token;
+var app = "xxx";
+var botid = "xxx";
+var ssurl = "xxx";
+var userlist=SpreadsheetApp.openByUrl(ssurl).getSheets()[0];
+var grouplist=SpreadsheetApp.openByUrl(ssurl).getSheets()[1];
+var raidlist=SpreadsheetApp.openByUrl(ssurl).getSheets()[2];
+var settings=SpreadsheetApp.openByUrl(ssurl).getSheets()[3];
+var pokelist=SpreadsheetApp.openByUrl(ssurl).getSheets()[4];
+var formlist=SpreadsheetApp.openByUrl(ssurl).getSheets()[5];
+var megalist=SpreadsheetApp.openByUrl(ssurl).getSheets()[6];
+var rvlist=SpreadsheetApp.openByUrl(ssurl).getSheets()[7];
+var typelist=SpreadsheetApp.openByUrl(ssurl).getSheets()[8];
+var movelist=SpreadsheetApp.openByUrl(ssurl).getSheets()[9];
+
+//received message
+function doPost(e){
+  var data=JSON.parse(e.postData.contents);
+  var uid=data.update_id;
+  if(data.message!=null){
+    var type=data.message.chat.type;
+    var id=data.message.from.id;
+    if(type=="private"){//privatemessage
+      var userrange=getuserrange(id);
+      if(userrange==null){//new user: language select
+        userlist.appendRow([id,data.message.from.username])
+        sendMessage(id,"언어를 선택해 주세요.\nPlease select your preferred language.\n",null,
+                    {"inline_keyboard":[[{text:"한국어️",callback_data:"ko"},{text:"English️",callback_data:"en"}]]})
+      }
+      else{//known: id, username
+        var userinfo=userrange.getValues()[0];
+        var language=userinfo[3];
+        if(language==""){
+          language=data.callback_query.data;
+          userrange.getCell(1,4).setValue(language);
+          var realname;
+          if(language=="en"){
+            if(data.callback_query.from.last_name==null){realname=data.callback_query.from.first_name;}
+            else{realname=data.callback_query.from.first_name+" "+data.callback_query.from.last_name;}
+          }
+          else if(language=="ko"){
+            if(data.callback_query.from.last_name==null){realname=data.callback_query.from.first_name;}
+            else{realname=data.callback_query.from.last_name+data.callback_query.from.first_name;}
+          }
+          userrange.getCell(1,3).setValue(realname)
+        }
+        if(language=="en"){enprivatemessage(data,userinfo);}
+        else if(language=="ko"){koprivatemessage(data,userinfo);}
+      }
+    }
+    else if(type=="group"||type=="supergroup"){//groupmessage
+      var gid=data.message.chat.id;
+      var grange=getgrouprange(gid);
+      if(grange==null){//new group
+        var gssurl=DriveApp.getFilesByName("gsstemplate").next().makeCopy(gid).getUrl();
+        var ginfo=SpreadsheetApp.openByUrl(gssurl).getSheets()[0];
+        ginfo.appendRow([data.message.chat.title,language])
+        var guserlist=SpreadsheetApp.openByUrl(gssurl).getSheets()[1];
+        var admins=getChatAdministrators(gid);
+        for(var i=0;i<admins.length;i++){
+          if(!admins[i].user.is_bot){
+            var adminid=admins[i].user.id;
+            var adminrange=getuserrange(adminid);
+            if(adminrange!=null){
+              var admininfo=adminrange.getValues()[0];
+              guserlist.appendRow([true,admininfo[0],admininfo[1],admininfo[2],admininfo[3],admininfo[4]])
+            }
+            /*else{
+            sendMessage(gid,"@"+admins[i].user.username+"님, 방장역할을 수월히 하시기 위해 저한테 개인톡을 주세요!")
+            }*/
+          }
+        }
+        guserlist.sort(2);
+        var gname=data.message.chat.title;
+        grouplist.appendRow([gid,gssurl,gname,language]);
+        grouplist.sort(1);
+        grange=getgrouprange(gid);
+      }
+      //finished new group
+      groupmessage(data,grange.getValues()[0]);
+    }
+  }
+  else if(data.edited_message!=null){
+    var id=data.edited_message.from.id;
+    var realname=name(data.edited_message.from);
+    var username=data.edited_message.from.username;
+    var type=data.edited_message.chat.type;
+    var text=data.edited_message.text;
+    var time=Utilities.formatDate(new Date(data.message.date*1000),"Asia/Seoul","yyyy/MM/dd HH:mm:ss 'GMT'Z");
+    userlist.appendRow([time,username,id,type,text,realname]);
+    sendMessage(id,"move along");
+  }
+  else if(data.callback_query!=null){
+    var id=data.callback_query.from.id;
+    var mid=data.callback_query.message.message_id;
+    var userrange=getuserrange(id);
+    var language=userrange.getCell(1,4).getValue();
+    if(language==""){
+      language=data.callback_query.data;
+      userrange.getCell(1,4).setValue(language)
+      var realname;
+      if(language=="en"){
+        if(data.callback_query.from.last_name==null){realname=data.callback_query.from.first_name;}
+        else{realname=data.callback_query.from.first_name+" "+data.callback_query.from.last_name;}
+        sendMessage(id,"Hello, "+realname+"! First, tell me your in-game ID.",null,{"force_reply":true});
+      }
+      else if(language=="ko"){
+        if(data.callback_query.from.last_name==null){realname=data.callback_query.from.first_name;}
+        else{realname=data.callback_query.from.last_name+data.callback_query.from.first_name;}
+        sendMessage(id,"안녕하세요, "+realname+"님! 먼저 포켓몬GO 인게임ID를 말씀해주세요.",null,{"force_reply":true});
+      }
+      userrange.getCell(1,3).setValue(realname)
+      var reset={"inline_keyboard":[[]]};
+      editMessageReplyMarkup(data.callback_query.message.chat.id,mid,reset);
+    }
+    else if(language=="en"){encallback(data);}
+    else if(language=="ko"){kocallback(data);}
+  }
+}
+
+//autonomous
+
+function triggerset(){
+  ScriptApp.newTrigger("clearoldraid").timeBased().inTimezone("Asia/Seoul").everyMinutes(1).create();
+  ScriptApp.newTrigger("newday").timeBased().inTimezone("Asia/Seoul").everyDays(1).atHour(0).nearMinute(0).create();
+  Utilities.sleep(1000);
+  ScriptApp.newTrigger("admincheck").timeBased().inTimezone("Asia/Seoul").everyDays(1).atHour(0).nearMinute(0).create();
+  ScriptApp.newTrigger("updateongoing").timeBased().inTimezone("Asia/Seoul").everyMinutes(1).create();
+}
+
+function triggerclear(){
+  var triggers=ScriptApp.getProjectTriggers();
+  for (var i=0;i<triggers.length;i++){
+    ScriptApp.deleteTrigger(triggers[i]);
+  }
+}
+
+function triggerreset(){
+  triggerclear();
+  triggerset();
+}
+
+function clearoldraid(){//StartTime & EndTime needs to be Date()
+  var now=new Date();
+  var groups=grouplist.getRange("A2:E").getValues();
+  for(var i=0;i<groups.length;i++){
+    var gssurl=groups[i][1];
+    var ongoing=SpreadsheetApp.openByUrl(gssurl).getSheets()[2];
+    var raidtimes=ongoing.getRange("C2:C").getValues();
+    var count=0;
+    for(var j=0;j<raidtimes.length;j++){
+      var endtime=new Date(raidtimes[j]);
+      if(endtime<now){
+        if(raidtimes.length==1){ongoing.getRange("A2:2").clearContent();}
+        else{ongoing.deleterow(j+2);}
+        raidtimes.splice(j,1);j--;
+      }
+    }
+  }
+}
+
+function admincheck(){
+  userlist.getRange("H2:H").clearContent();
+  var groups=grouplist.getRange("A2:B").getValues();
+  for(var i=0;i<groups.length;i++){
+    var gid=groups[i][0];
+    var gssurl=groups[i][1];
+    var guserlist=SpreadsheetApp.openByUrl(gssurl).getSheets()[1];
+    var gusers=guserlist.getRange("A2:H").getValues();
+    var admins=getChatAdministrators(gid);
+    for(var j=0;j<admins.length;j++){
+      if(!admins[j].user.is_bot){
+        var adminid=admins[j].user.id;
+        var adminrange=getuserrange(adminid);
+        if(adminrange!=null){adminrange.getCell(1,8).setValue(gid);}
+        var rownum=find(adminid,gusers,1)+2;
+        if(rownum==1){
+          var admininfo=adminrange.getValues()[0];
+          guserlist.appendRow([true,admininfo[0],admininfo[1],admininfo[2],admininfo[3],admininfo[4],admininfo[5],admininfo[6]]);
+          guserlist.sort(2);
+        }
+        else{guserlist.getRange("A"+rownum).setValue(true);}
+      }
+    }
+  }
+}
+
+
+function updateraidlist(){
+  var now=raidtime("6:00");
+  var knowngid=grouplist.getRange("A2:B").getValues();
+  if(now>=raidtime("5:00")&&now<=raidtime("22:00")){
+    Logger.log(true)
+    for(var i=0;i<knowngid.length;i++){
+      var gssurl=groups[i][1];
+      var ginfo=SpreadsheetApp.openByUrl(gssurl).getSheets()[0].getRange("A2:D2");
+      var raidmid=ginfo.getCell(1,4).getValue();
+      var message="5성보스:"
+      /*
+      if(raidmid==""){
+        var sentmessage=sendMessage(knowngid[i],)
+      }
+      */
+    }
+  }
+  else{Logger.log("false")}
+  /*
+  else{
+    for(var i=0;i<knowngid.length;i++){
+      var gssurl=DriveApp.getFilesByName(knowngid[i]).next().getUrl();
+      var ginfo=SpreadsheetApp.openByUrl(gssurl).getSheets()[0].getRange("D2");
+      deleteMessage(knowngid[i],raidmid)
+    }
+  }
+  */
+}
+
+function updateongoing(){
+  var knownbosses=getstarbosses(5);
+  var groups=grouplist.getRange("A2:D").getValues();
+  for(var i=0;i<groups.length;i++){
+    var gid=groups[i][0];
+    var language=groups[i][3];
+    var timezone=groups[i][4];
+    if(timezone!=""){
+      if(language=="en"){enupdateongoing(gid,timezone,knownbosses);}
+      else if(language=="ko"){koupdateongoing(gid,timezone,knownbosses);}
+    }
+  }
+}
