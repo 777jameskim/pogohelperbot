@@ -1,0 +1,188 @@
+function doGet(e){
+  var data=JSON.stringify(e);
+  return HtmlService.createHtmlOutput(data);
+}
+
+function getMe(){
+  var url=telegram+"/getMe";
+  var data=UrlFetchApp.fetch(url);
+  Logger.log(data.getContentText());
+}
+
+function getUpdates(){
+  var url=telegram+"/getUpdates";
+  var data=UrlFetchApp.fetch(url);
+  Logger.log(data.getContentText());
+}
+
+function setWebhook(){
+  var appurl=app;
+  var connections=100;
+  var url=telegram+"/setWebhook?url="+appurl+"&max_connections="+connections;
+  var data=UrlFetchApp.fetch(url);
+  Logger.log(data.getContentText());
+}
+
+function getWebhookInfo(){
+  var url=telegram+"/getWebhookInfo";
+  var data=UrlFetchApp.fetch(url);
+  Logger.log(data.getContentText());
+}
+
+function deleteWebhook(){
+  var url=telegram+"/deleteWebhook";
+  var data=UrlFetchApp.fetch(url);
+  Logger.log(data.getContentText());
+}
+
+function resetWebhook(){
+  deleteWebhook();
+  setWebhook();
+}
+
+function sendMessage(id,text,reply,keyboard){
+  var url=telegram+"/sendMessage"
+  var data={"chat_id":id,"text":text,"parse_mode":"HTML"}
+  if(reply!=null){
+    data["reply_to_message_id"]=reply;
+  }
+  if(keyboard!=null){
+    data["reply_markup"]=keyboard;
+  }
+  var options={
+    'method':'post',
+    'contentType':'application/json',
+    'payload':JSON.stringify(data)
+  };
+  return JSON.parse(UrlFetchApp.fetch(url,options)).result;
+}
+
+function editMessageText(cid,mid,text,keyboard){
+  var url=telegram+"/editMessageText"
+  var data={"chat_id":cid,"message_id":mid,"text":text}
+  if(keyboard!=null){
+    data["reply_markup"]=keyboard;
+  }
+  var options={
+    'method':'post',
+    'contentType':'application/json',
+    'payload':JSON.stringify(data)
+  };
+  return UrlFetchApp.fetch(url,options);
+}
+
+function editMessageReplyMarkup(cid,mid,keyboard){
+  var url=telegram+"/editMessageReplyMarkup"
+  var data={"chat_id":cid,"message_id":mid,"reply_markup":keyboard}
+  var options={
+    'method':'post',
+    'contentType':'application/json',
+    'payload':JSON.stringify(data)
+  };
+  return UrlFetchApp.fetch(url,options);
+}
+
+function deleteMessage(cid,mid){
+  var url=telegram+"/deleteMessage"
+  var data={"chat_id":cid,"message_id":mid}
+  var options={
+    'method':'post',
+    'contentType':'application/json',
+    'payload':JSON.stringify(data)
+  };
+  return UrlFetchApp.fetch(url,options);
+}
+
+function getChat(cid){
+  var url=telegram+"/getChat?chat_id="+cid;
+  return JSON.parse(UrlFetchApp.fetch(url)).result;
+}
+
+function getChatMember(cid,uid){
+  var url=telegram+"/getChatMember?chat_id="+cid+"&user_id="+uid;
+  return JSON.parse(UrlFetchApp.fetch(url)).result;
+}
+
+function getChatAdministrators(cid){
+  var url=telegram+"/getChatAdministrators?chat_id="+cid;
+  return JSON.parse(UrlFetchApp.fetch(url)).result;
+}
+
+function timezone(lat,long){
+  var url="http://api.timezonedb.com/v2.1/get-time-zone?key=KDYG39NM1DYQ&format=json&by=position&lat="+lat+"&lng="+long;
+  return JSON.parse(UrlFetchApp.fetch(url)).zoneName;
+}
+
+function isArray(object){
+  if(object==null){return false;}
+  return typeof object=="object"&&object.length!=undefined;
+}
+
+function booltobin(array){
+  var bin=0;
+  for(var i=0;i<array.length;i++){if(array[i]!=false){bin=bin+Math.pow(2,i);}}
+  return bin;
+}
+
+function bintobool(num,length){
+  var array=[];
+  for(var i=length-1;i>=0;i--){
+    Logger.log(array)
+    if(Math.floor(num/Math.pow(2,i))==1){
+      array[i]=1;
+      num=num-Math.pow(2,i);
+    }
+    else{array[i]=0;}
+  }
+  return array;
+}
+
+function zhtraditional(range){
+  var values=range.getValues();
+  for(var i=0;i<values.length;i++){
+    var value=values[i][0].split(" / ")[0];
+    Logger.log(value)
+    range.getCell(i+1,1).setValue(value);
+  }
+}
+
+function grouplistupdate(){//need gid, writes gssurl, name, language
+  var groups=grouplist.getRange("A2:B").getValues();
+  for(var i=0;i<groups.length;i++){
+    var gid=groups[i][0];
+    var gssurl=DriveApp.getFilesByName(gid).next().getUrl();
+    groups[i][1]=gssurl;
+    var grange=SpreadsheetApp.openByUrl(gssurl).getSheets()[0].getRange("A2:C2").getValues()[0];
+    groups[i]=groups[i].concat(grange);
+  }
+  grouplist.getRange("A2:E").setValues(groups);
+}
+
+function pokelistupdate(){//writes forma1, rva1
+  var start=new Date().getTime();
+  pokelist.getRange("D2:E").clearContent();
+  var haslist=pokelist.getRange("D2:E").getValues();
+  formlist.sort(1);
+  var hasformnum=formlist.getRange("A2:B").getValues();
+  var firstrow=0;
+  for(var i=1;i<hasformnum.length;i++){
+    if(hasformnum[i][0]!=hasformnum[i-1][0]){
+      haslist[hasformnum[i-1][0]-1][0]="A"+(Number(firstrow)+2)+":"+(i+1);
+      firstrow=i;i++;
+    }
+  }
+  haslist[hasformnum[hasformnum.length-1][0]-1][0]="A"+(Number(firstrow)+2)+":"+(hasformnum.length+1);
+  rvlist.sort(1);
+  var hasrvnum=rvlist.getRange("A2:D").getValues();
+  firstrow=0;
+  for(var i=1;i<hasrvnum.length;i++){
+    if(hasrvnum[i][0]!=hasrvnum[i-1][0]){
+      haslist[hasrvnum[i-1][0]-1][1]="A"+(Number(firstrow)+2)+":"+(i+1);
+      firstrow=i;
+    }
+  }
+  haslist[hasrvnum[hasrvnum.length-1][0]-1][1]="A"+(Number(firstrow)+2)+":"+(hasrvnum.length+1);
+  pokelist.getRange("D2:E").setValues(haslist);
+  var end=new Date().getTime();
+  Logger.log(end-start);
+}
