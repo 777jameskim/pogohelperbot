@@ -1,0 +1,256 @@
+function enprivatecommand(data,userinfo){
+  var mid=data.message.message_id;
+  var date=data.message.date;
+  var text=data.message.text.slice(1);
+  var id=data.message.from.id;
+  var username=data.message.from.username;
+  var name=userinfo[2];
+  var language=userinfo[3];
+  var pogoid=userinfo[4];
+  var pogoteam=userinfo[5];
+  var pogolevel=userinfo[6];
+  var isadmin=userinfo[7];
+  var ismember=userinfo[8];
+  var command=stringarray(data.message.text)[0];
+  if(command=="/start"){
+    sendMessage(id,"Hi, "+name+"!");
+  }
+  //edit user info
+  else if(command=="/id"){
+    var newid=text;
+    if(newid==pogoid){sendMessage(id,"Isn't that your current ID...?",mid);}
+    else if(newid!=null){
+      getuserrange(userinfo[0]).getCell(1,5).setValue(newid);
+      sendMessage(id,"Got it! Your in-game ID has been changed to "+newid+"!",mid);
+    }
+    else{sendMessage(id,"You didn't write anything!",mid);}
+  }
+  else if(command=="/team"){
+    var newteam=text;
+    if(newteam==null){sendMessage(id,"Which team are you changing to?",mid,teamselect)}
+    else{getuserrange(userinfo[0]).getCell(1,6).setValue(enresetteam(id,pogoteam,newteam));}
+  }
+  else if(command=="/level"){
+    text=stringarray(text);
+    var newlevel=0;
+    for(var i=0;i<text.length&&newlevel==0;i++){if(!isNaN(text[i])){newlevel=text[i]}}
+    if(newlevel==pogolevel){
+      sendMessage(id,"Isn't that your current level...?",mid);
+    }
+    else if(0<newlevel&&newlevel<=40&&newlevel%1==0){
+      getuserrange(userinfo[0]).getCell(1,7).setValue(newlevel);
+      sendMessage(id,"Got it! Your level has been changed to "+newlevel+"!",mid);
+    }
+    else{sendMessage(id,"You didn't write a valid level!",mid);}
+  }
+  else if(command=="/levelup"){
+    if(pogolevel<39){
+      var newlevel=pogolevel+1;
+      getuserrange(userinfo[0]).getCell(1,7).setValue(newlevel);
+      sendMessage(id,"Congratulations on reaching level "+newlevel+", "+name+"!",mid);
+    }
+    else if(pogolevel==39){
+      getuserrange(userinfo[0]).getCell(1,7).setValue(40);
+      sendMessage(id,"Congratulations on reaching the max level, "+name+"!",mid);
+    }
+    else{sendMessage(id,"It's impossible to level up beyond the max level!",mid);}
+  }
+  else if(command=="/language"){
+    sendMessage(id,"Which language do you want to change to?",null,
+                {"inline_keyboard":[[{text:"English️",callback_data:"language en"},{text:"한국어️",callback_data:"language ko"}]]})
+  }
+  else if(command=="/bosslist"){
+    var knownbosses=raidlist.getRange("A2:G").getValues();
+    if(knownbosses[0][0]==""){sendMessage(id,"There are currently no known raid bosses!")}
+    else{
+      var message="Current bosses:\n\n";
+      var i=0;
+      if(knownbosses[0][5]=="EX"){
+        message=message+"EX raid bosses: "
+        for(i;i<knownbosses.length&&knownbosses[i][5]=="EX";i++){
+          var formindex=knownbosses[i][1];
+          if(formindex==""){formindex==null}
+          message=message+enmonname([findmon(knownbosses[i][0],"en"),formindex]);
+          if(knownbosses[i][6]){message=message+"✨, ";}
+          else{message=message+", ";}
+        }
+        message=message.slice(0,message.length-2)
+      }
+      else{message=message.slice(0,message.length-1)}
+      for(var s=5;s>0;s--){
+        if(knownbosses[i][5]==s){
+          message=message+"\n"+s+" star raid bosses: "
+          for(i;i<knownbosses.length&&knownbosses[i][5]==s;i++){
+            var formindex=knownbosses[i][1];
+            if(formindex==""){formindex=null}
+            message=message+enmonname([findmon(knownbosses[i][0],"en"),formindex]);
+            if(knownbosses[i][6]){message=message+"✨, ";}
+            else{message=message+", ";}
+          }
+          message=message.slice(0,message.length-2)
+        }
+      }
+      sendMessage(id,message);
+    }
+  }
+  //pogo organiser
+  else if(isadmin!=""){
+    if(command=="/addboss"){enaddboss(id,bossformat(stringarray(text),"en"));}
+    else if(command=="/deleteboss"){endeleteboss(id,bossformat(stringarray(text),"en").slice(0,2));}
+    else{return false;}
+    //group customiser
+  }
+  else{return false;}
+  return true;
+}
+
+function enmonname(mon){//mon=[moninfo,formindex]
+  var prefix="";
+  if(mon[1]=="RV"){
+    var rv=hasrv(mon[0][0]);
+    prefix=rv[3];
+  }
+  else if(mon[1]!==null&&mon[1]!==""&&mon[1]!="X"){
+    var forms=hasform(mon[0][0]);
+    if(mon[1]!=forms.length){prefix=forms[mon[1]][3];}
+  }
+  if(prefix!=""){prefix=prefix+" ";}
+  return prefix+mon[0][5];
+}
+
+function enaddboss(id,newboss){
+  //newboss=[moninfo,formindex,stars,shiny]
+  if(newboss[0]==null){sendMessage(id,"You didn't write a valid pokémon name/dex number!");return;}
+  //moninfo=[dexnum,type1,type2,hasform,hasrv,en,ja,fr,de,it,es,ko,zh]
+  var errorcode=checkboss(newboss);
+  //errorcode%16: (all forms of) this pokémon are taken
+  if(Math.floor(errorcode/16)==1){
+    if(newboss[0][3]==""&&newboss[0][4]==""){sendMessage(id,newboss[0][5]+" is already a raid boss!")}
+    else{sendMessage(id,"All forms of "+newboss[0][5]+" are already raid bosses!")}
+  }
+  //errorcode%8: this form is taken (if other forms exist)
+  else if(Math.floor(errorcode%16/8)==1){sendMessage(id,enmonname(newboss)+" is already a raid boss!")}
+  //hasrv
+  else if(newboss[1]==null&&newboss[0][4]!=""){
+    var rv=hasrv(newboss[0][0]);
+    sendMessage(id,"Is "+newboss[0][5]+" "+rv[3]+"?",null,{"inline_keyboard":[
+                [{text:"✅",callback_data:"addboss "+newboss[0][0]+" RV "+newboss[2]+" "+newboss[3]},
+                {text:"❌",callback_data:"addboss "+newboss[0][0]+" X "+newboss[2]+" "+newboss[3]}]
+                ]});
+  }
+  //errorcode%4: needs form
+  else if(Math.floor(errorcode%8/4)==1){enaskform(id,newboss)}
+  //errorcode%2: needs stars
+  else if(Math.floor(errorcode%4/2)==1){
+    var stars={"inline_keyboard":[
+      [{text:"😈️",callback_data:"addboss "+newboss[0][0]+" "+newboss[1]+" 1 "+newboss[3]},
+       {text:"😈😈",callback_data:"addboss "+newboss[0][0]+" "+newboss[1]+" 2 "+newboss[3]},
+       {text:"😈😈😈",callback_data:"addboss "+newboss[0][0]+" "+newboss[1]+" 3 "+newboss[3]}],
+      [{text:"😈😈😈😈",callback_data:"addboss "+newboss[0][0]+" "+newboss[1]+" 4 "+newboss[3]},
+       {text:"😈😈😈😈😈",callback_data:"addboss "+newboss[0][0]+" "+newboss[1]+" 5 "+newboss[3]}],
+      [{text:"EX",callback_data:"addboss "+newboss[0][0]+" "+newboss[1]+" EX "+newboss[3]}]
+    ]}
+    sendMessage(id,"What star raid is "+enmonname(newboss)+"?",null,stars);
+  }
+  //errorcode%1: needs shiny
+  else if(Math.floor(errorcode%2/1)==1){
+    sendMessage(id,"Can "+enmonname(newboss)+" be shiny?",null,{"inline_keyboard":[
+      [{text:"✅",callback_data:"addboss "+newboss[0][0]+" "+newboss[1]+" "+newboss[2]+" "+true},
+       {text:"❌",callback_data:"addboss "+newboss[0][0]+" "+newboss[1]+" "+newboss[2]+" "+false}]
+    ]});
+  }
+  //errorcode==0
+  else{enwriteboss(id,newboss);}
+  return errorcode;
+}
+
+function enaskform(id,newboss){
+  var moninfo=newboss[0]
+  var forms=formnamefilter(moninfo[0],"en");
+  var keyboard=[];
+  if(forms.length<3){
+    if(forms[0]==""){keyboard.push([{text:" ",callback_data:"addboss "+newboss[0][0]+" 0 "+newboss[2]+" "+newboss[3]}])}
+    else(keyboard.push({text:forms[0],callback_data:"addboss "+newboss[0][0]+" 0 "+newboss[2]+" "+newboss[3]}))
+    keyboard[0].push({text:forms[1],callback_data:"addboss "+newboss[0][0]+" 1 "+newboss[2]+" "+newboss[3]})
+  }
+  else{
+    keyboard.push([{text:"All",callback_data:"addboss "+newboss[0][0]+" "+forms.length+" "+newboss[2]+" "+newboss[3]}]);
+    for(var i=0;i<forms.length;i++){
+      var form=forms[i];
+      if(i==0&&form==""){keyboard.push([{text:" ",callback_data:"addboss "+newboss[0][0]+" "+i+" "+newboss[2]+" "+newboss[3]}]);}
+      else if(i%2==0){keyboard.push([{text:form,callback_data:"addboss "+newboss[0][0]+" "+i+" "+newboss[2]+" "+newboss[3]}]);}
+      else{keyboard[Math.floor(i/2)+1].push({text:form,callback_data:"addboss "+newboss[0][0]+" "+i+" "+newboss[2]+" "+newboss[3]});}
+    }
+  }
+  sendMessage(id,"Which form of "+newboss[0][5]+"?",null,{"inline_keyboard":keyboard});
+}
+
+function enwriteboss(id,newboss){
+  writeboss(newboss[0],newboss[1],newboss[2],newboss[3]);
+  var message="Got it! "+enmonname(newboss);
+  if(newboss[3]){message=message+"✨";}
+  var stars;
+  if(newboss[2]!="EX"){stars=newboss[2]+" star"}
+  else{stars="EX"}
+  sendMessage(id,message+" has been added as a "+stars+" raid boss!");
+}
+
+function endeleteboss(id,boss){
+  if(boss[0]==null){sendMessage(id,"You didn't write a valid pokémon name/dex number!")}
+  else{
+    raidlist.sort(2);
+    raidlist.sort(1);
+    var knownbosses=raidlist.getRange("A2:B").getValues();
+    var firstindex=sortedfirst(boss[0][0],knownbosses,0);
+    if(firstindex==-1){sendMessage(id,boss[0][5]+" isn't currently a raid boss to begin with...?")}
+    else{
+      var count=0;
+      for(var i=firstindex;i<knownbosses.length&&boss[0][0]==knownbosses[i][0];i++){count++;}
+      if(count==1){
+        if(knownbosses.length==1){raidlist.insertRowAfter(raidlist.getLastRow());}
+        raidlist.deleteRow(firstindex+2);
+        sendMessage(id,boss[0][5]+" has been removed as a raid boss!")
+      }
+      else if(boss[1]!=null){
+        if(boss[1]=="All"){
+          if(knownbosses.length==count){raidlist.insertRowAfter(raidlist.getLastRow());}
+          raidlist.deleteRows(firstindex+2,count);
+          sendMessage(id,boss[0][5]+" has been removed as a raid boss!")
+        }
+        else{
+          var foundindex=-1;
+          for(var i=firstindex;i<(firstindex+count);i++){
+            if(boss[1]=="X"&&knownbosses[i][1]==""){foundindex=i;}
+            if(boss[1]==knownbosses[i][1]){foundindex=i;}
+          }
+          if(foundindex==-1){sendMessage(id,enmonname(boss)+" isn't currently a raid boss to begin with...?")}
+          else{
+            if(knownbosses.length==1){raidlist.insertRowAfter(raidlist.getLastRow());}
+            raidlist.deleteRow(foundindex+2);
+            sendMessage(id,enmonname(boss)+" has been removed as a raid boss!")
+          }
+        }
+      }
+      else{
+        var forms=hasform(boss[0][0]);
+        var keyboard=[[{text:"All",callback_data:"deleteboss "+boss[0][0]+" All"}]];
+        var bossform=0;
+        for(var i=firstindex;i<(firstindex+count);i++){
+          var formindex=knownbosses[i][1];
+          var form="";
+          if(formindex===""){formindex="X";}
+          else if(formindex=="RV"){form=hasrv(boss[0][0])[3];}
+          else{form=forms[formindex][3];}
+          if(form==""){form=" "}
+          if(bossform%2==0){keyboard.push([{text:form,callback_data:"deleteboss "+boss[0][0]+" "+formindex}]);}
+          else{keyboard[Math.floor(bossform/2)+1].push({text:form,callback_data:"deleteboss "+boss[0][0]+" "+formindex});}
+          bossform++;
+        }
+        sendMessage(id,"Which form of "+boss[0][5]+"?",null,{"inline_keyboard":keyboard});
+      }
+    }
+    raidlist.sort(2);
+    raidlist.sort(1);
+    raidlist.sort(6,false);
+  }
+}
