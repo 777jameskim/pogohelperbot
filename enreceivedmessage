@@ -1,0 +1,70 @@
+function enprivatemessage(data,userinfo){
+  var mid=data.message.message_id;
+  var date=data.message.date;
+  if(data.message.text!=null){
+    var text=data.message.text;
+    //new user
+    if(userinfo==null){
+      var id=data.message.from.id;
+      var realname;
+      if(data.message.from.last_name==null){realname=data.message.from.first_name}
+      else{realname=data.message.from.first_name+" "+data.message.from.last_name}
+      sendMessage(id,"Hello, "+realname+"! First, tell me your in-game ID.",null,{"force_reply":true});
+    }
+    else{
+      var pogolevel=userinfo[6];
+      //setup needed
+      if(pogolevel==""){enusersetup(data,userinfo);}
+      //setup finished
+      else if(text[0]=="/"){
+        var result=enprivatecommand(data,userinfo);
+        if(!result){result=koprivatecommand(data,userinfo);}
+        if(!result){sendMessage(userinfo[0],stringarray(text)[0]+" isn't a command!");}
+      }
+    }
+  }
+}
+
+function engroupmessage(data,gid){
+  var mid=data.message.message_id;
+  var date=data.message.date;
+  var gssurl=DriveApp.getFilesByName(gid).next().getUrl();
+  var ginfo=SpreadsheetApp.openByUrl(gssurl).getSheets()[0];
+  var guserlist=SpreadsheetApp.openByUrl(gssurl).getSheets()[1];
+  var ongoing=SpreadsheetApp.openByUrl(gssurl).getSheets()[2];
+  var gymlist=SpreadsheetApp.openByUrl(gssurl).getSheets()[3];
+  var stoplist=SpreadsheetApp.openByUrl(gssurl).getSheets()[4];
+  if(data.message.text!=null){
+    var gtimezone=ginfo.getRange("C2").getValue();
+    if(gtimezone==""){
+      sendMessage(gid,"Your administrator must first finish the group setup!")
+    }
+    else if(data.message.text[0]=="/"){
+      var result=engroupcommand(data,gid);
+      if(!result){result=kogroupcommand(data,gid);}
+      if(!result){sendMessage(gid,stringarray(data.message.text)[0]+" isn't a command!");}
+    }
+  }
+  else if(data.message.new_chat_members!=null){
+    var newmembers=data.message.new_chat_members;
+    var onlybots=true;
+    for(var i=0;i<newmembers.length;i++){
+      if(!newmembers[i].is_bot){
+        onlybots=false;
+        if(getuserrange(newmembers[i].id)==null){
+          var newusername=newmembers[i].username;
+          var realname;
+          if(newmembers[i].last_name==null){realname=newmembers[i].first_name}
+          else{realname=newmembers[i].first_name+" "+newmembers[i].last_name}
+          userlist.appendRow([newmembers[i].id,newusername,realname,"en","","","","",gid]);
+          userlist.sort(1);
+        }
+        else{
+          var userrange=getuserrange(newmembers[i].id);
+          userrange.getCell(1,9).setValue(gid);
+        }
+      }
+    }
+    if(!onlybots){sendMessage(gid,"Hello! If this is your first time using raidbot, please start a private chat with me to get started!");}
+  }
+}
