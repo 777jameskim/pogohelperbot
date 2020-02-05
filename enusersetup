@@ -1,0 +1,45 @@
+function enusersetup(data,userinfo) {
+  //userinfo=[userid,username,language,PoGOid,team,level,isadmin,ismember]
+  var text=data.message.text;
+  var mid=data.message.message_id;
+  var id=data.message.from.id;
+  var username=data.message.from.username;
+  var userrange=getuserrange(userinfo[0]);
+  var pogoid=userinfo[4];
+  var pogoteam=userinfo[5];
+  var pogolevel=userinfo[6];
+  if(pogolevel==""){
+    if(pogoteam==""){
+      if(pogoid==""){
+        var command=stringarray(text)[0];
+        if(command=="/start"){
+          var realname;
+          if(data.message.from.last_name==null){realname=data.message.from.first_name}
+          else{realname=data.message.from.first_name+" "+data.message.from.last_name}
+          sendMessage(id,"Hello, "+realname+"! First, tell me your in-game ID.",null,{"force_reply":true});
+        }
+        else{
+          userrange.getCell(1,5).setValue(text);
+          sendMessage(id,"Hi, "+text+"! Next, tell me your team name.",mid,teamselect);
+        }
+      }
+      else{
+        sendMessage(id,"Please use one of the buttons! These buttons will be how you join raids later on.")
+      }
+    }
+    else{
+      if(isNaN(text)){sendMessage(id,"That's not a number!",mid);}
+      else if(0<text&&text<=40&&text%1==0){
+        userrange.getCell(1,6).setValue(text);
+        var reply;
+        if(0<text&&text<=20){reply="Welcome to the world of Pokémon GO!"}
+        else if(20<text&&text<30){reply="You're not very far from reaching level 30!"}
+        else if(30<=text&&text<40){reply="Until the day you reach the maximum level!"}
+        else{reply="You're already a master player!"}
+        reply=reply+" Happy hunting!\nBefore you go, please read the instruction manual!\nhttps://telegra.ph/Raidbot-instruction-manual-08-31"
+        sendMessage(id,reply,mid);
+      }
+      else{sendMessage(id,"That level is impossible!",mid);}
+    }
+  }
+}
