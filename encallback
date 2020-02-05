@@ -1,0 +1,104 @@
+function encallback(data){
+  var id=data.callback_query.from.id;
+  var cid=data.callback_query.message.chat.id;
+  var type=data.callback_query.message.chat.type;
+  var mid=data.callback_query.message.message_id;
+  var cbid=data.callback_query.id;
+  var cbdata=stringarray(data.callback_query.data);
+  var command=cbdata.splice(0,1);
+  if(type=="private"){
+    if(command=="Team"){
+      var userrange=getuserrange(id);
+      var pogoteam=userrange.getCell(1,6).getValue();
+      var team=cbdata;
+      if(pogoteam==""){
+        if(team=="Instinct"){editMessageText(id,mid,"Your team has been set to the sparky Team Instinct!");}
+        else if(team=="Mystic"){editMessageText(id,mid,"Your team has been set to the ice-cold Team Mystic!");}
+        else if(team=="Valor"){editMessageText(id,mid,"Your team has been set to the fiery Team Valor!");}
+        sendMessage(id,"Finally, tell me your current level.",mid,{"force_reply":true})
+        userrange.getCell(1,6).setValue(team);
+      }
+      else{userrange.getCell(1,6).setValue(enresetteam(id,pogoteam,team));}
+    }
+    else if(command=="language"){
+      var userrange=getuserrange(id);
+      userrange.getCell(1,4).setValue(cbdata);
+      var gid=userrange.getCell(1,9).getValue();
+      if(gid!=""){
+        var gssurl=DriveApp.getFilesByName(gid).next().getUrl();
+        var guserlist=SpreadsheetApp.openByUrl(gssurl).getSheets()[1];
+        var knownid=guserlist.getRange("B2:B").getValues();
+        var rownum=sortedfind(id,knownid)+2;
+        if(rownum!=1){guserlist.getRange("E"+rownum).setValue(cbdata);}
+      }
+      if(cbdata=="ko"){sendMessage(id,"언어가 한국어로 설정되었습니다!")}
+      else if(cbdata=="en"){sendMessage(id,"Your language has been set to English!")}
+    }
+    else if(command=="addboss"){
+      enaddboss(id,[findmon(cbdata[0]),cbdata[1],cbdata[2],cbdata[3]]);
+      deleteMessage(cid,mid);
+    }
+    else if(command=="deleteboss"){
+      endeleteboss(id,[findmon(cbdata[0]),cbdata[1]]);
+      deleteMessage(cid,mid);
+    }
+  }
+  else if(type=="group"||type=="supergroup"){
+    var gid=data.callback_query.message.chat.id;
+    var gssurl=DriveApp.getFilesByName(gid).next().getUrl();
+    var ginfo=SpreadsheetApp.openByUrl(gssurl).getSheets()[0];
+    var ongoing=SpreadsheetApp.openByUrl(gssurl).getSheets()[2];
+    if(command=="language"){
+      var grouprange=getgrouprange(gid);
+      grouprange.getCell(1,3).setValue(cbdata);
+      var gssurl=DriveApp.getFilesByName(gid).next().getUrl();
+      var ginfo=SpreadsheetApp.openByUrl(gssurl).getSheets()[0];
+      ginfo.getRange("B2").setValue(cbdata);
+      if(cbdata=="ko"){sendMessage(gid,"톡방의 언어가 한국어로 설정되었습니다!")}
+      else if(cbdata=="en"){sendMessage(gid,"The group's language has been set to English!")}
+    }
+    else if(command=="report"){//cbdata=[mid,stars,dexnum,(formindex)]
+      var timezone=ginfo.getRange("C2").getValue();
+      var raidcode=cbdata[0];
+      var raidcodes=ongoing.getRange("A2:A").getValues();
+      var rownum=find(raidcode,raidcodes)+2;
+      var raidinfo=ongoing.getRange("A"+rownum+":"+rownum).getValues()[0];
+      if(cbdata[2]==null){var bossinfo=getstarbosses(cbdata[1]);}
+      else{
+        var bossinfo=findboss(cbdata[2]);
+        if(cbdata[3]!=null){for(var i=0;i<bossinfo.length&&isArray(bossinfo[0]);i++){if(bossinfo[i][1]==cbdata[3]){bossinfo=bossinfo[i];}}}
+      }
+      var newraid=[new Date(raidinfo[1]),raidinfo[2],cbdata[1],bossinfo];
+      enreport(data.callback_query.message.date,gid,timezone,raidcode,newraid);
+    }
+    deleteMessage(cid,mid);
+  }
+  var reset={"inline_keyboard":[[]]};
+  editMessageReplyMarkup(cid,mid,reset);
+}
+
+function enresetteam(id,prevteam,nextteam){
+  var newteam=validteam(nextteam);
+  if(prevteam==newteam){
+    sendMessage(id,"Isn't that your current team...?");
+    return prevteam;
+  }
+  else{
+    if(newteam=="Instinct"){
+      sendMessage(id,"Our instincts can battle with the best of them! Your team has been changed to Team Instinct.");
+      return "Instinct";
+    }
+    else if(newteam=="Mystic"){
+      sendMessage(id,"Exceptional, Breathtaking, Wonderful! Your team has been changed to Team Mystic.");
+      return "Mystic";
+    }
+    else if(newteam=="Valor"){
+      sendMessage(id,"Strong will can accomplish anything! Your team has been changed to Team Valor.");
+      return "Valor";
+    }
+    else{
+      sendMessage(id,"That is not a team name! Please choose between Team Instinct, Mystic or Valor.",null,teamselect);
+      return prevteam;
+    }
+  }
+}
