@@ -1,0 +1,294 @@
+var teamselect={"inline_keyboard":[[{text:"⚡️",callback_data:"Team Instinct"},{text:"❄️",callback_data:"Team Mystic"},{text:"🔥",callback_data:"Team Valor"}]]};
+var Instinct=["⚡️","I","i","Y","y","Instinct","instinct","Yellow","yellow","Zapdos","zapdos","Spark","spark","Electric","electric","ㅇㅅ","ㅇㅅㅌㅌ","인스팅트","인스","노랑","썬더","스파크","전기"];
+var Mystic=["❄️","M","m","B","b","Mystic","mystic","Blue","blue","Articuno","articuno","Blanche","blanche","Water","water","Ice","ice","ㅁㅅㅌ","미스틱","파랑","프리져","블랑쉬","물","얼음"];
+var Valor=["🔥","V","v","R","r","Valor","valor","Red","red","Moltres","moltres","Candela","candela","Fire","fire","ㅂㄹ","발러","발로","빨강","파이어","칸델라","불"];
+var shiny=["✨","S","s","Shiny","shiny","색","색이다른","이로치"];
+var Alola=["Alolan","アローラ","d'Alola","Alola-","di Alola","de Alola","알로라","阿羅拉"];
+var Alolan=["Alola","アローラ","알로라","阿羅拉"];
+var Galar=["Galarian","ガラル","de Galar","Galar-","di Galar","de Galar","가라르","伽勒爾"];
+var Galarian=["Galar","ガラル","가라르","伽勒爾"];
+
+function find(value,values,index){
+  var l=values.length;
+  for(var i=0;i<l;i++){
+    if(index==null){if(value==values[i]){return i;}}
+    else{if(value==values[i][index]){return i;}}
+  }
+  return -1;
+}
+
+function sortedfind(value,values,index,reverse){
+  //find value from values in sorted list
+  //option: index - values is 2D array, index points to which element of array is sorted
+  //option: reverse - the array is sorted in reverse
+  var i=Math.floor(values.length/2);
+  if(index==null){if(value==values[i]){return i;}}
+  else{if(value==values[i][index]){return i;}}
+  if(values.length==1){return -1;}
+  if(!reverse){
+    if(index==null){
+      if(value>values[i]){
+        if(sortedfind(value,values.slice(i))==-1){return -1;}
+        else{return sortedfind(value,values.slice(i))+i;}
+      }
+      return sortedfind(value,values.slice(0,i));
+    }
+    else{
+      if(value>values[i][index]){
+        if(sortedfind(value,values.slice(i),index)==-1){return -1;}
+        else{return sortedfind(value,values.slice(i),index)+i;}
+      }
+      return sortedfind(value,values.slice(0,i),index);
+    }
+  }
+  else{
+    if(index==null){
+      if(value<values[i]){
+        if(sortedfind(value,values.slice(i),true)==-1){return -1;}
+        else{return sortedfind(value,values.slice(i),true)+i;}
+      }
+      return sortedfind(value,values.slice(0,i),true);
+    }
+    else{
+      if(value<values[i][index]){
+        if(sortedfind(value,values.slice(i),index,true)==-1){return -1;}
+        else{return sortedfind(value,values.slice(i),index,true)+i;}
+      }
+      return sortedfind(value,values.slice(0,i),index,true);
+    }
+  }
+}
+
+function sortedfirst(value,values,index,reverse){// find first occurance from sorted list
+  var n=sortedfind(value,values,index,reverse);
+  if(n==-1){return -1;}
+  for(var i=n-1;i>-1;i--){
+    if(index==null){if(value!=values[i]){return i+1;}}
+    else{if(value!=values[i][index]){return i+1;}}
+  }
+  return 0;
+}
+
+function stringarray(string){
+  var array=string.replace(',','').split(" ")
+  for(var i=0;i<array.length;i++){
+    if(array[i].toLowerCase()=="true"){array[i]=true}
+    else if(array[i].toLowerCase()=="false"){array[i]=false}
+    else if(array[i].toLowerCase()=="null"){array[i]=null}
+  }
+  return array;
+}
+
+function arraystring(array){
+  var string=array[0];
+  for(var i=1;i<array.length;i++){string=string+" "+array[i];}
+  return string;
+}
+
+function getuserrange(id){
+  var knownid=userlist.getRange("A2:A").getValues();
+  var rownum=sortedfind(id,knownid)+2;
+  if(rownum==1){return;}
+  return userlist.getRange("A"+rownum+":"+rownum);
+}
+
+function getgrouprange(gid){
+  var knowngid=grouplist.getRange("A2:A").getValues();
+  var rownum=sortedfind(gid,knowngid)+2;
+  if(rownum==1){return;}
+  return grouplist.getRange("A"+rownum+":"+rownum);
+}
+
+function languageindex(language){
+  if(language=="en"){return 0;}
+  else if(language=="ja"){return 1;}
+  else if(language=="fr"){return 2;}
+  else if(language=="de"){return 3;}
+  else if(language=="it"){return 4;}
+  else if(language=="es"){return 5;}
+  else if(language=="ko"){return 6;}
+  else if(language=="zh"){return 7;}
+  return;
+}
+
+function getcolumn(array,index){
+  var column=[];
+  for(var i=0;i<array.length;i++){column.push(array[i][index]);}
+  return column;
+}
+
+function findmon(name,language){
+  //input(name): name or dexnum
+  //option(language): search name only using this language (reduces execution time)
+  //output: 2D array of moninfo
+  if(!isNaN(name)){
+    var pokenum=pokelist.getLastRow()-1;
+    if(name<0||name>pokenum||name%1!=0){return [];}
+    return pokelist.getRange("A"+(Number(name)+1)+":"+(Number(name)+1)).getValues()[0];
+  }
+  var knownmons=pokelist.getRange("F2:M").getValues();
+  var l=knownmons.length;
+  if(language!=null){
+    var langi=languageindex(language);
+    for(var i=0;i<l;i++){
+      if(name.toLowerCase()==knownmons[i][langi].toLowerCase()){return pokelist.getRange("A"+(i+2)+":"+(i+2)).getValues()[0]}
+    }
+  }
+  else{
+    var m=knownmons[0].length;
+    for(var i=0;i<l;i++){
+      for(var j=0;j<m;j++){
+        if(name.toLowerCase()==knownmons[i][j].toLowerCase()){return pokelist.getRange("A"+(i+2)+":"+(i+2)).getValues()[0]}
+      }
+    }
+  }
+  return [];
+}
+
+function findrv(moninfo){
+  //output: 2D array of rvinfo
+  if(moninfo[4]!=""){return rvlist.getRange(moninfo[4]).getValues();}
+  return [];
+}
+
+function findform(moninfo,rv){
+  //output: 2D array of forminfo
+  //option(rv): return forminfo of regional variant ("","Alolan","Galarian")
+  if(moninfo[3]!=""){
+    if(moninfo[4]==""){return formlist.getRange(moninfo[3]).getValues();}
+    else{
+      if(rv==null){rv="";}
+      var knownforms=formlist.getRange(moninfo[3]).getValues();
+      var firstrow=find(rv,knownforms,1);
+      if(firstrow==-1){return [];}
+      else{
+        for(var i=firstrow+1;i<knownforms.length;i++){if(knownforms[i][1]!=rv){return formlist.getRange(moninfo[3]).getValues().slice(firstrow,i);}}
+        return formlist.getRange(moninfo[3]).getValues().slice(firstrow,knownforms.length);
+      }
+    }
+  }
+  return [];
+}
+
+function findfi(moninfo,name,language,rv){
+  //option(rv): use in findform
+  var forms=findform(moninfo,rv);
+  //findform=[dexnum,rv,type1,type2,en,ja,fr,de,it,es,ko,zh]
+  if(forms.length==0){return -1;}
+  if(language!=null){
+    var ffn=formnamefilter(forms,language)
+    var langi=languageindex(language)+4;
+    for(var i=0;i<forms.length;i++){if(name.toLowerCase()==forms[i][langi].toLowerCase()||name.toLowerCase()==ffn[i].toLowerCase()){return i;}}
+  }
+  for(var i=0;i<forms.length;i++){for(var j=3;j<forms[i].length;j++){if(name.toLowerCase()==forms[i][j].toLowerCase()){return i;}}}
+  return -1;
+}
+
+function formnamefilter(forms,language){
+  //input(forms): findform(moninfo,rv)
+  //output: array of filtered form names (ffn) in specified language
+  var langi=languageindex(language)+4;
+  var names=getcolumn(forms,langi);
+  if(names[0]!=""){//all forms have names
+    var letters=names[0].split('');
+    var reverse=names[0].split('').reverse().join('');
+  }
+  else{//the first form is a blank form
+    if(names.length<=2){return names;}
+    var letters=names[1];
+    var reverse=names[1].split('').reverse().join('');
+  }
+  for(var i=1;i<names.length;i++){
+    var name=names[i];
+    for(var j=0;j<letters.length;j++){if(name[j]!=letters[j]){letters=letters.slice(0,j)}}
+    for(var j=0;j<reverse.length;j++){if(name[name.length-1-j]!=reverse[j]){reverse=reverse.slice(0,j)}}
+  }
+  var ffn=[];
+  for(var i=0;i<forms.length;i++){
+    var form=names[i];
+    if(letters!=""){form=form.slice(letters.length)}
+    if(reverse!=""){form=form.slice(0,form.length-reverse.length)}
+    ffn.push(form);
+  }
+  return ffn;
+}
+
+function raidtime(date,timezone,time){
+  //input(date): Date()
+  //output: Date()
+  var today=stringarray(Utilities.formatDate(new Date(date*1000),timezone,"HH:mm:ss MMM dd yyyy Z").toString());
+  if(time.length==4){time='0'+time;}
+  time=time+":00";
+  today[0]=time;
+  return new Date(arraystring(today));
+}
+
+//??
+function eggtime(raidtime,stars){
+  if(stars==null){
+    var eggtimes=settings.getRange("B2:C").getValues();
+    if(eggtimes[0]<eggtimes[1]){stars="EX";}
+    else{stars=5;}
+  }
+  if(stars=="EX"){return new Date(raidtime.getTime()-settings.getRange("C2").getValue()*60*1000);}
+  else{return new Date(raidtime.getTime()-settings.getRange("B2").getValue()*60*1000);}
+}
+
+//??
+function endtime(raidtime,stars){
+  if(stars==null){
+    var eggtimes=settings.getRange("B3:C").getValues();
+    if(eggtimes[0]<eggtimes[1]){stars="EX";}
+    else{stars=5;}
+  }
+  if(stars=="EX"){return new Date(raidtime.getTime()+settings.getRange("C3").getValue()*60*1000);}
+  else{return new Date(raidtime.getTime()+settings.getRange("B3").getValue()*60*1000);}
+}
+
+function timer(){
+  var start=new Date().getTime();
+  Logger.log(getstarbosses(1))
+  var end=new Date().getTime();
+  Logger.log(end-start);
+}
+
+function getmonbosses(dexnum){
+  //output: 2D array of bossinfo
+  var knownbosses=raidlist.getRange("A2:O").getValues();
+  var monboss=[];
+  for(var i=0;i<knownbosses.length;i++){if(knownbosses[i][0]==dexnum){monboss.push(knownbosses[i])}}
+  return monboss;
+}
+
+function getstarbosses(stars){
+  //output: 2D array of bossinfo
+  var knownbosses=raidlist.getRange("A2:O").getValues();
+  var starboss=[];
+  for(var i=0;i<knownbosses.length;i++){if(knownbosses[i][5]==stars){starboss.push(knownbosses[i])}}
+  return starboss;
+}
+
+function findboss(name,language,stars){
+  if(!isNaN(name)){
+    var knownbosses=raidlist.getRange("A2:A").getValues();
+    if(find(name,knownbosses)!=-1){return getmonbosses(name);}
+    else{return [];}
+  }
+  if(stars==null){var knownbosses=raidlist.getRange("A2:O").getValues();}
+  else{var knownbosses=getstarbosses(stars);}
+  var l=knownbosses.length;
+  if(language!=null){
+    var langi=languageindex(language)+11;
+    for(var i=0;i<l;i++){
+      if(name.toLowerCase()==knownbosses[i][langi].toLowerCase()){return knownbosses[i];}
+    }
+  }
+  else{
+    for(var i=0;i<l;i++){
+      for(var j=0;j<knownbosses[i].length;j++){
+        if(name.toLowerCase()==knownbosses[i][j].toLowerCase()){return knownbosses[i];}
+      }
+    }
+  }
+  return [];
+}       
